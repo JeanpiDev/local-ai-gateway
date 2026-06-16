@@ -1,0 +1,86 @@
+services:
+  # ── Motor de inferencia: sirve los modelos locales ──────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - ai_net
+    restart: unless-stopped
+    # El puerto 11434 NO se expone al host: solo es accesible dentro de la red
+    # interna (open-webui y gateway). El acceso externo pasa por el gateway.
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    # ── Aceleración GPU (NVIDIA) — descomenta si el host tiene GPU + nvidia-container-toolkit ──
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ── Descarga el modelo una vez al levantar, luego termina ────────────────────
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - ai_net
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - MODEL=${OLLAMA_MODEL:-qwen2.5:7b-instruct}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'echo "Descargando modelo $$MODEL..."; ollama pull "$$MODEL"; echo "Modelo listo."'
+    restart: "no"
+
+  # ── Interfaz web de chat (consumo humano) ───────────────────────────────────
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "${WEBUI_PORT:-3000}:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - open_webui_data:/app/backend/data
+    networks:
+      - ai_net
+    restart: unless-stopped
+
+  # ── Gateway: expone la API (compatible OpenAI) protegida por API key ────────
+  # Otros proyectos consumen aquí: POST {GATEWAY_PORT}/v1/chat/completions con
+  # header "Authorization: Bearer <LLM_API_KEY>". Apunta tu dominio a este puerto.
+  gateway:
+    image: nginx:1.27-alpine
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "${GATEWAY_PORT:-8080}:80"
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+    volumes:
+      - ./gateway/nginx.conf.template:/etc/nginx/nginx.conf.template:ro
+      - ./gateway/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    networks:
+      - ai_net
+    restart: unless-stopped
+
+networks:
+  ai_net:
+    driver: bridge
+
+volumes:
+  ollama_data:
+  open_webui_data:

@@ -1,0 +1,41 @@
+# Plantilla de nginx para el gateway. `entrypoint.sh` reemplaza __LLM_API_KEY__
+# por el valor de la variable de entorno LLM_API_KEY antes de arrancar nginx.
+
+events {}
+
+http {
+    # Autoriza solo si el header Authorization trae exactamente "Bearer <LLM_API_KEY>".
+    # Compatible con clientes OpenAI (AsyncOpenAI/openai-python envían ese header).
+    map $http_authorization $api_authorized {
+        default                         0;
+        "Bearer __LLM_API_KEY__"        1;
+    }
+
+    server {
+        listen 80;
+        server_name _;
+
+        # Respuesta de salud sin auth (para health checks / balanceadores).
+        location = /healthz {
+            add_header Content-Type text/plain;
+            return 200 "ok\n";
+        }
+
+        location / {
+            if ($api_authorized = 0) {
+                return 401 '{"error":"unauthorized: missing or invalid API key"}';
+            }
+
+            proxy_pass http://ollama:11434;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_http_version 1.1;
+
+            # Streaming (Server-Sent Events de /v1/chat/completions con stream=true)
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout 600s;
+            proxy_send_timeout 600s;
+        }
+    }
+}
