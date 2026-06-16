@@ -1,0 +1,4 @@
+# Forzar LF en todo el repo. Crítico para los scripts .sh que corren dentro de
+# contenedores Linux: con CRLF, /bin/sh falla con "no such file or directory".
+* text=auto eol=lf
+*.sh text eol=lf
