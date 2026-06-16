@@ -1,9 +1,9 @@
-# Metis AI Gateway
+# Local AI Gateway
 
-Servicio de **IA local genérico** para uso organizacional. Levanta un modelo
-open-source con [Ollama](https://ollama.com) y expone una **API compatible con
-OpenAI** detrás de un gateway protegido por API key, para que cualquier proyecto
-de la organización pueda consumirlo desde su propio dominio. Incluye además
+Servicio de **IA local autohospedada**, genérico y reutilizable. Levanta un
+modelo open-source con [Ollama](https://ollama.com) y expone una **API compatible
+con OpenAI** detrás de un gateway protegido por API key, para que **cualquier
+proyecto** pueda consumirlo desde su propio dominio. Incluye además
 [Open WebUI](https://github.com/open-webui/open-webui) como interfaz de chat.
 
 ```
@@ -73,9 +73,10 @@ resp = client.chat.completions.create(
 )
 ```
 
-### Conectar Contact Analyzer como fallback
+### Ejemplo: usarlo como proveedor/fallback en un proyecto
 
-Cuando el gateway tenga dominio, en el `.env` del backend de Contact Analyzer:
+Cualquier proyecto que ya hable con la API de OpenAI puede apuntar al gateway
+cambiando el `base_url` y la api key. Por ejemplo, en un backend con fallback LLM:
 
 ```
 FALLBACK_LLM_PROVIDER=openai
@@ -84,8 +85,8 @@ FALLBACK_LLM_API_KEY=<LLM_API_KEY>
 FALLBACK_LLM_BASE_URL=http://<dominio>:8080/v1
 ```
 
-> Requiere añadir el soporte de `base_url` en el `ai_client` de Contact Analyzer
-> (revertido por ahora; se hará cuando este servicio esté desplegado con dominio).
+> El proyecto consumidor solo necesita que su cliente OpenAI acepte un `base_url`
+> personalizado apuntando a este gateway.
 
 ## Seguridad
 
