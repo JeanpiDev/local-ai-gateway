@@ -4,6 +4,10 @@
 events {}
 
 http {
+    # La clave del map ("Bearer <LLM_API_KEY>") supera el bucket por defecto;
+    # se amplía para que nginx pueda construir el hash al arrancar.
+    map_hash_bucket_size 128;
+
     # Autoriza solo si el header Authorization trae exactamente "Bearer <LLM_API_KEY>".
     # Compatible con clientes OpenAI (AsyncOpenAI/openai-python envían ese header).
     map $http_authorization $api_authorized {
