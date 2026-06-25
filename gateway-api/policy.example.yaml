@@ -40,6 +40,12 @@ stages:
   - name: PolicyStructure
     enabled: true
     fail_mode: closed
+  - name: Heuristics            # regex ES/EN de injection/jailbreak (sin modelo, barata)
+    enabled: true
+    fail_mode: closed
+    params:
+      extra_patterns: []        # patrones regex propios adicionales
+      # disable_defaults: true  # para usar SOLO tus extra_patterns
   - name: LLMGuard
     enabled: true
     fail_mode: open

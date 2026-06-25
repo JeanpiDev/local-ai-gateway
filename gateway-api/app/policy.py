@@ -78,6 +78,7 @@ def _default_policy_from_env() -> Policy:
         roles=Roles(drop_client_system=s.drop_client_system_messages),
         stages=[
             StageConfig(name="PolicyStructure"),
+            StageConfig(name="Heuristics"),
             StageConfig(
                 name="LLMGuard",
                 params={

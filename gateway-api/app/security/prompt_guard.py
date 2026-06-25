@@ -13,13 +13,14 @@ from fastapi import HTTPException, status
 
 from ..policy import Policy, StageConfig, get_policy
 from .pipeline import GuardBlocked, GuardContext, GuardPipeline, Stage
-from .stages import LLMGuardStage, PolicyStructureStage
+from .stages import HeuristicsStage, LLMGuardStage, PolicyStructureStage
 
 logger = logging.getLogger("gateway.guard")
 
 # Registro de etapas: nombre -> constructor(policy, stage_config) -> Stage
 STAGE_REGISTRY: dict[str, Callable[[Policy, StageConfig], Stage]] = {
     "PolicyStructure": lambda policy, cfg: PolicyStructureStage(policy),
+    "Heuristics": lambda policy, cfg: HeuristicsStage(params=cfg.params),
     "LLMGuard": lambda policy, cfg: LLMGuardStage(params=cfg.params),
 }
 

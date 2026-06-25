@@ -1,16 +1,18 @@
-"""Etapas concretas del guard, configuradas desde la política (Fase 2).
+"""Etapas concretas del guard, configuradas desde la política.
 
-- `PolicyStructureStage` (etapa 1): defensa estructural dirigida por la política —
-  system prompt fijo, descarte de `system` del cliente, whitelist de roles y límites
-  de nº de mensajes / tamaño. Determinista, fail-closed.
-- `LLMGuardStage` (etapas 3+4): escaneo llm-guard con parámetros de la política.
-  Redacción sanea; gate (PromptInjection/TokenLimit) bloquea. Fail-open (etapa pesada).
+- `PolicyStructureStage` (etapa 1): defensa estructural — system prompt fijo, descarte
+  de `system` del cliente, whitelist de roles y límites. Determinista, fail-closed.
+- `HeuristicsStage` (etapa 2): regex multi-idioma (ES/EN) de injection/jailbreak.
+  Corta ataques obvios SIN cargar el modelo pesado. Barata, fail-closed.
+- `LLMGuardStage` (etapas 3+4): escaneo llm-guard. Redacción sanea; gate bloquea.
+  Fail-open (etapa pesada).
 
-Etapas futuras (Heurísticas, Output Guard): ver `gateway-api/DESIGN.md`.
+Etapa futura (Output Guard): ver `gateway-api/DESIGN.md`.
 """
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from ..config import get_settings
@@ -21,6 +23,20 @@ logger = logging.getLogger("gateway.guard")
 
 # Scanners que REDACTAN (sanean el texto) en vez de bloquear la petición.
 REDACTING_SCANNERS = {"Anonymize", "Secrets", "BanSubstrings"}
+
+
+def content_to_text(content: Any) -> str | None:
+    """Extrae texto escaneable de un `content` (str o partes multimodales OpenAI)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [
+            p.get("text", "")
+            for p in content
+            if isinstance(p, dict) and p.get("type") == "text"
+        ]
+        return "\n".join(parts) if parts else None
+    return None
 
 
 class PolicyStructureStage(Stage):
@@ -34,19 +50,16 @@ class PolicyStructureStage(Stage):
         p = self.policy
         out: list[dict] = []
 
-        # System prompt fijo del servidor al frente (defensa estructural).
         if p.system_prompt:
             out.append({"role": "system", "content": p.system_prompt})
 
         for msg in ctx.messages:
             role = msg.get("role")
 
-            # Descartar 'system' del cliente si así se configuró.
             if role == "system" and p.roles.drop_client_system:
                 logger.info("Descartado mensaje system del cliente (política)")
                 continue
 
-            # Whitelist de roles (por defecto incluye todos los comunes → inerte).
             if role not in p.roles.allowed:
                 return StageResult(
                     action=StageAction.BLOCK,
@@ -54,7 +67,6 @@ class PolicyStructureStage(Stage):
                     detail={"error": "role_not_allowed", "role": role, "allowed": p.roles.allowed},
                 )
 
-            # Límite de tamaño por mensaje (None = sin límite → inerte).
             if p.limits.max_chars_per_message is not None:
                 text = msg.get("content")
                 if isinstance(text, str) and len(text) > p.limits.max_chars_per_message:
@@ -66,7 +78,6 @@ class PolicyStructureStage(Stage):
 
             out.append(msg)
 
-        # Límite de nº de mensajes (cuenta tras el saneo estructural).
         if p.limits.max_messages is not None and len(out) > p.limits.max_messages:
             return StageResult(
                 action=StageAction.BLOCK,
@@ -75,6 +86,71 @@ class PolicyStructureStage(Stage):
             )
 
         ctx.messages = out
+        return StageResult(action=StageAction.ALLOW)
+
+
+# ── Patrones de injection/jailbreak (ES + EN). Alta precisión: frases explícitas de
+#    ataque, para minimizar falsos positivos sobre texto legítimo. Ampliables por política.
+DEFAULT_INJECTION_PATTERNS: list[str] = [
+    # — Ignorar/olvidar instrucciones previas —
+    r"ignore\s+(all\s+|any\s+)?(of\s+)?(the\s+)?(previous|prior|above|preceding)\s+(instructions?|prompts?|messages?|rules?)",
+    r"disregard\s+(all\s+|any\s+)?(the\s+)?(previous|prior|above|your)\s+(instructions?|rules?|guidelines?|prompt)",
+    r"forget\s+(all\s+|everything\s+|your\s+)?(previous\s+)?(instructions?|rules?|context)",
+    r"ignor(a|es|en|e|ar)\s+(que\s+)?(todas?\s+)?(las\s+|tus\s+)?(instrucciones|reglas|[oó]rdenes|indicaciones|normas|restricciones|filtros|pol[ií]tica\s+de\s+contenido)(\s+(previas|anteriores|de\s+arriba))?",
+    r"(olv[ií]da(te)?|haz\s+caso\s+omiso)\s+(de\s+)?(todas?\s+)?(las\s+|tus\s+)?(instrucciones|reglas|indicaciones)",
+    r"no\s+sigas\s+(las\s+|tus\s+)?(instrucciones|reglas|normas)",
+    # — Revelar/mostrar el system prompt —
+    r"(reveal|show|print|repeat|display|expose|tell\s+me)\s+(me\s+)?(your\s+|the\s+)?(system\s+|initial\s+|original\s+)?(prompt|instructions?)",
+    r"(revela|mu[eé]strame?|imprime|repite|dime|ens[eé][ñn]ame)\s+(tu|el|las)\s+(system\s+)?(prompt|instrucciones\s+(del\s+sistema|iniciales)|indicaciones\s+del\s+sistema)",
+    # — Jailbreak / personas sin restricciones —
+    r"jailbreak",
+    r"do\s+anything\s+now",
+    r"(developer|dev|god|admin|root)\s+mode",
+    r"modo\s+(desarrollador|dios|administrador|sin\s+restricciones)",
+    r"(you\s+are\s+now|act\s+as|pretend\s+to\s+be|you\s+must\s+act\s+as)\s+(an?\s+)?(dan|unrestricted|jailbroken|uncensored)",
+    r"(act[uú]a|comp[oó]rtate|finge)\s+(como|que\s+eres)\s+(un[ao]?\s+)?(dan|asistente\s+sin\s+(restricciones|l[ií]mites|filtros)|ia\s+sin\s+restricciones)",
+    # — Anular restricciones / bypass —
+    r"(with\s+no|without\s+any|no)\s+(restrictions|limitations|rules|filters|content\s+policy|guardrails)",
+    r"bypass\s+(your\s+|the\s+|all\s+)?(safety|security|guardrails|filters|restrictions|rules)",
+    r"(sin|ignorando)\s+(ninguna\s+)?(restricci[oó]n|restricciones|l[ií]mites|reglas|filtros|pol[ií]tica\s+de\s+contenido)",
+    r"(evita|s[aá]ltate|omite|esquiva)\s+(las\s+|tus\s+|los\s+)?(restricciones|reglas|filtros|medidas\s+de\s+seguridad|controles)",
+    # — Tokens de plantilla de chat (inyección de rol) —
+    r"<\|?im_start\|?>|<\|?im_end\|?>|<<sys>>|\[/?inst\]",
+]
+
+
+class HeuristicsStage(Stage):
+    name = "Heuristics"
+    fail_mode = "closed"
+
+    def __init__(self, params: dict[str, Any] | None = None) -> None:
+        params = params or {}
+        patterns = [] if params.get("disable_defaults") else list(DEFAULT_INJECTION_PATTERNS)
+        patterns += params.get("extra_patterns", []) or []
+        self._compiled = [(p, re.compile(p, re.IGNORECASE | re.UNICODE)) for p in patterns]
+        logger.info("Heuristics: %d patrones cargados", len(self._compiled))
+
+    def run(self, ctx: GuardContext) -> StageResult:
+        for msg in ctx.messages:
+            if msg.get("role") != "user":
+                continue
+            text = content_to_text(msg.get("content"))
+            if not text:
+                continue
+            for pattern, rx in self._compiled:
+                if rx.search(text):
+                    logger.warning("Heuristics bloqueó: patrón %r", pattern)
+                    return StageResult(
+                        action=StageAction.BLOCK,
+                        score=1.0,
+                        reason="patrón de injection detectado por heurísticas",
+                        detail={
+                            "error": "input_rejected",
+                            "message": "El contenido fue bloqueado por la capa de seguridad.",
+                            "blocked_by": ["Heuristics"],
+                            "matched": pattern,
+                        },
+                    )
         return StageResult(action=StageAction.ALLOW)
 
 
@@ -92,7 +168,6 @@ class LLMGuardStage(Stage):
         self._scanners: list[Any] | None = None
         self._vault: Any = None
 
-    # ── Carga perezosa de scanners (solo si el guard está habilitado) ─────────
     def _build_scanners(self) -> list[Any]:
         from llm_guard.input_scanners import (
             Anonymize,
@@ -146,21 +221,7 @@ class LLMGuardStage(Stage):
         if get_settings().guard_enabled and self._scanners is None:
             self._scanners = self._build_scanners()
 
-    @staticmethod
-    def _content_to_text(content: Any) -> str | None:
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            parts = [
-                p.get("text", "")
-                for p in content
-                if isinstance(p, dict) and p.get("type") == "text"
-            ]
-            return "\n".join(parts) if parts else None
-        return None
-
     def run(self, ctx: GuardContext) -> StageResult:
-        # GUARD_ENABLED es el interruptor maestro (en dev se apaga para imagen ligera).
         if not get_settings().guard_enabled:
             return StageResult(action=StageAction.ALLOW)
 
@@ -173,7 +234,7 @@ class LLMGuardStage(Stage):
         for i, msg in enumerate(ctx.messages):
             if msg.get("role") != "user":
                 continue
-            text = self._content_to_text(msg.get("content"))
+            text = content_to_text(msg.get("content"))
             if not text:
                 continue
 
