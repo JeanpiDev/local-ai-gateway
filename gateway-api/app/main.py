@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -70,8 +71,6 @@ app = FastAPI(
 # Assets de Swagger/ReDoc servidos localmente (descargados en el build) para que
 # /docs y /redoc funcionen sin salida a internet. Si la carpeta no existe (p.ej. al
 # correr fuera de Docker sin descargarlos), los docs simplemente no se montan.
-import os  # noqa: E402
-
 _STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 if os.path.isdir(_STATIC_DIR):
     app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")

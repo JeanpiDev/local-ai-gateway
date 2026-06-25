@@ -110,7 +110,6 @@ services:
       - GATEWAY_HF_TOKEN=${HF_TOKEN:-}
       - GATEWAY_MAX_CONCURRENCY=${MAX_CONCURRENCY:-2}
       - GATEWAY_QUEUE_TIMEOUT=${QUEUE_TIMEOUT:-30}
-      - GATEWAY_SYSTEM_PROMPT=${SYSTEM_PROMPT:-}
       - GATEWAY_POLICY_FILE=${POLICY_FILE:-policy.yaml}
     volumes:
       # Caché de modelos de llm-guard (HuggingFace) para no re-descargar en cada recreate.

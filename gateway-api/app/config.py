@@ -43,11 +43,6 @@ class Settings(BaseSettings):
     # Subcadenas prohibidas extra (separadas por coma) — lista negra propia.
     guard_ban_substrings: str = ""
 
-    # ── Política del system prompt (defensa estructural) ─────────────────────
-    # Si hay system prompt fijo, se antepone y se descartan los 'system' del cliente.
-    system_prompt: str = ""
-    drop_client_system_messages: bool = True
-
     # ── Concurrencia ─────────────────────────────────────────────────────────
     # Peticiones simultáneas permitidas hacia el backend (techo = CPU/NUM_PARALLEL).
     max_concurrency: int = 2

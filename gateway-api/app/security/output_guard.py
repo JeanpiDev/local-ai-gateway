@@ -47,6 +47,12 @@ SECRET_PATTERNS: list[tuple[re.Pattern, str]] = [
 ]
 
 
+# Detección de fuga del system prompt por ventana deslizante sobre texto normalizado.
+_LEAK_MIN_PROMPT_LEN = 30   # system prompts más cortos no se comparan (poco fiable)
+_LEAK_WINDOW = 40           # longitud del fragmento buscado en la salida
+_LEAK_STEP = 10             # salto entre ventanas
+
+
 def _normalize(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
@@ -63,12 +69,11 @@ class OutputGuard:
 
     def _leaks_system_prompt(self, out_text: str) -> bool:
         sp = _normalize(self.system_prompt)
-        if len(sp) < 30:   # demasiado corto para detectar de forma fiable
+        if len(sp) < _LEAK_MIN_PROMPT_LEN:
             return False
         ot = _normalize(out_text)
-        win, step = 40, 10
-        for i in range(0, len(sp) - win + 1, step):
-            if sp[i:i + win] in ot:
+        for i in range(0, len(sp) - _LEAK_WINDOW + 1, _LEAK_STEP):
+            if sp[i:i + _LEAK_WINDOW] in ot:
                 return True
         return False
 

@@ -19,6 +19,16 @@ _recent: deque[dict[str, Any]] = deque(maxlen=200)
 _started_at = time.time()
 
 
+def _push_event(phase: str, user_id: str, **fields: Any) -> None:
+    """Añade un evento al buffer circular con timestamp UTC. Llamar bajo `_lock`."""
+    _recent.append({
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "phase": phase,
+        "user_id": user_id,
+        **fields,
+    })
+
+
 def record_input(user_id: str, outcome: str, blocked_stage: str | None,
                  audit: list[dict], latency_ms: float) -> None:
     """Registra el resultado del pipeline de ENTRADA para una petición."""
@@ -32,28 +42,21 @@ def record_input(user_id: str, outcome: str, blocked_stage: str | None,
                 _counters[f"sanitize:{a['stage']}"] += 1
             if "fail-open" in (a.get("reason") or ""):
                 _counters[f"degraded:{a['stage']}"] += 1
-        _recent.append({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "phase": "input",
-            "user_id": user_id,
-            "outcome": outcome,
-            "blocked_stage": blocked_stage,
-            "latency_ms": round(latency_ms, 1),
-            "stages": audit,
-        })
+        _push_event(
+            "input",
+            user_id,
+            outcome=outcome,
+            blocked_stage=blocked_stage,
+            latency_ms=round(latency_ms, 1),
+            stages=audit,
+        )
 
 
 def record_output(user_id: str, action: str, reason: str) -> None:
     """Registra una decisión del OutputGuard (block/sanitize)."""
     with _lock:
         _counters[f"output:{action}"] += 1
-        _recent.append({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "phase": "output",
-            "user_id": user_id,
-            "outcome": action,
-            "reason": reason,
-        })
+        _push_event("output", user_id, outcome=action, reason=reason)
 
 
 def metrics() -> dict[str, Any]:
