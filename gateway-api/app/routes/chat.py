@@ -49,8 +49,8 @@ async def chat_completions(req: ChatCompletionRequest, auth: AuthContext = AuthD
         )
 
     # 1) Guard de entrada: política estructural + heurísticas + escaneo anti-injection.
-    messages = [m if isinstance(m, dict) else m.model_dump() for m in payload["messages"]]
-    payload["messages"] = prompt_guard.apply(messages, user_id=auth.user_id)
+    # payload viene de model_dump(), así que messages ya son dicts.
+    payload["messages"] = prompt_guard.apply(payload["messages"], user_id=auth.user_id)
 
     # 2) Reenvío bajo control de concurrencia (+ guard de salida).
     og = prompt_guard.get_output_guard()
@@ -63,11 +63,7 @@ async def _complete(token: str, payload: dict, og: OutputGuard | None, user_id: 
     async with concurrency.slot():
         resp = await upstream.chat_completions(token, payload)
     if resp.status_code != 200:
-        try:
-            detail = resp.json()
-        except Exception:
-            detail = resp.text
-        raise HTTPException(status_code=resp.status_code, detail=detail)
+        raise HTTPException(status_code=resp.status_code, detail=upstream.error_detail(resp))
 
     data = resp.json()
 

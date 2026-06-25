@@ -73,9 +73,9 @@ def _default_policy_from_env() -> Policy:
     parámetros que las variables GATEWAY_* — así el comportamiento no cambia.
     """
     s = get_settings()
+    # El system prompt y los roles viven en policy.yaml; este fallback (sin archivo)
+    # usa los defaults de Policy/Roles (sin system prompt forzado, descarta 'system' del cliente).
     return Policy(
-        system_prompt=s.system_prompt,
-        roles=Roles(drop_client_system=s.drop_client_system_messages),
         stages=[
             StageConfig(name="PolicyStructure"),
             StageConfig(name="Heuristics"),

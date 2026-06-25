@@ -45,6 +45,13 @@ class AuthContext:
 _cache: dict[str, tuple[AuthContext, float]] = {}
 
 
+def _purge_expired(now: float) -> None:
+    """Elimina las entradas vencidas (evita que la caché crezca sin límite)."""
+    expired = [tok for tok, (_, expiry) in list(_cache.items()) if expiry <= now]
+    for tok in expired:
+        _cache.pop(tok, None)
+
+
 async def get_auth(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> AuthContext:
@@ -72,6 +79,7 @@ async def get_auth(
         )
 
     ctx = AuthContext(token=token, user=user)
+    _purge_expired(now)   # barrido oportunista en el camino de cache-miss (poco frecuente)
     _cache[token] = (ctx, now + settings.auth_cache_ttl)
     return ctx
 

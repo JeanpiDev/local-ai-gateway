@@ -41,6 +41,14 @@ def _bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def error_detail(resp: httpx.Response) -> Any:
+    """Cuerpo de error de una respuesta del backend: JSON si se puede parsear, texto si no."""
+    try:
+        return resp.json()
+    except Exception:
+        return resp.text
+
+
 async def get_user(token: str) -> dict[str, Any] | None:
     """Valida una API key/JWT y devuelve el usuario, o None si es inválida."""
     try:

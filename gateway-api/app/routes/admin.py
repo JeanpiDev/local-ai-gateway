@@ -81,11 +81,7 @@ async def provision_user(body: ProvisionUserRequest):
     # 1) Crear usuario
     r = await upstream.admin_add_user(admin_key, body.name, body.email, body.password, body.role)
     if r.status_code != 200:
-        try:
-            detail = r.json()
-        except Exception:
-            detail = r.text
-        raise HTTPException(status_code=r.status_code, detail=detail)
+        raise HTTPException(status_code=r.status_code, detail=upstream.error_detail(r))
     user = r.json()
     user_id = user.get("id")
 
@@ -98,14 +94,10 @@ async def provision_user(body: ProvisionUserRequest):
     # 3) Generar su API key
     k = await upstream.create_api_key(user_token)
     if k.status_code != 200:
-        try:
-            detail = k.json()
-        except Exception:
-            detail = k.text
         raise HTTPException(
             status_code=502,
             detail={"message": "Usuario creado pero no se pudo generar la API key. "
-                              "¿Ejecutaste POST /admin/setup?", "upstream": detail},
+                              "¿Ejecutaste POST /admin/setup?", "upstream": upstream.error_detail(k)},
         )
     api_key = k.json().get("api_key")
 

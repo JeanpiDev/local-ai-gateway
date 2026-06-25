@@ -72,7 +72,6 @@ Con el servicio levantado:
 | `GATEWAY_POLICY_FILE` | `policy.yaml` | Ruta de la política; si no existe, se deriva de estas vars |
 | `GATEWAY_MAX_CONCURRENCY` | `2` | Peticiones simultáneas al backend |
 | `GATEWAY_QUEUE_TIMEOUT` | `30` | Seg. esperando slot antes de 429 |
-| `GATEWAY_SYSTEM_PROMPT` | `""` | System prompt fijo (si no usas `policy.yaml`) |
 
 ## Build dev vs prod
 
