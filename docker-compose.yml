@@ -115,9 +115,9 @@ services:
     volumes:
       # Caché de modelos de llm-guard (HuggingFace) para no re-descargar en cada recreate.
       - gateway_api_cache:/root/.cache
-      # Política declarativa del guard (opcional). Si no montas un archivo, el guard
-      # usa la política derivada de las variables de entorno. Ver gateway-api/policy.example.yaml
-      # - ./gateway-api/policy.yaml:/app/policy.yaml:ro
+      # Política declarativa del guard. Si borras este montaje, el guard usa la
+      # política derivada de las variables de entorno. Ver gateway-api/policy.example.yaml
+      - ./gateway-api/policy.yaml:/app/policy.yaml:ro
     networks:
       - ai_net
     restart: unless-stopped
