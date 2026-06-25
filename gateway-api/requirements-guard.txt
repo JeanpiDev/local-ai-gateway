@@ -1,0 +1,5 @@
+# Capa anti prompt-injection. Arrastra torch/transformers => imagen grande (~varios GB).
+# Solo se instala si se construye con --build-arg INSTALL_GUARD=true (por defecto).
+# En dev puedes construir con INSTALL_GUARD=false y GATEWAY_GUARD_ENABLED=false
+# para una imagen ligera y arranque rápido.
+llm-guard==0.3.16

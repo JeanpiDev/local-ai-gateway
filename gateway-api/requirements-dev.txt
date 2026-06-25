@@ -1,0 +1,4 @@
+# Dependencias solo para correr los tests (no van en la imagen).
+#   pip install -r requirements.txt -r requirements-dev.txt
+#   pytest
+pytest==8.3.4

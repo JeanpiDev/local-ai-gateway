@@ -4,6 +4,11 @@ services:
     image: ollama/ollama:latest
     volumes:
       - ollama_data:/root/.ollama
+    environment:
+      # Nº de peticiones de inferencia concurrentes (slots). En CPU los slots
+      # comparten núcleos: más slots = mejor reparto/latencia, NO más throughput,
+      # y consume más RAM (cada slot tiene su propio KV-cache).
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-2}
     networks:
       - ai_net
     restart: unless-stopped
@@ -34,7 +39,7 @@ services:
       - ai_net
     environment:
       - OLLAMA_HOST=http://ollama:11434
-      - MODEL=${OLLAMA_MODEL:-qwen2.5:7b-instruct}
+      - MODEL=${OLLAMA_MODEL:-qwen2.5:3b-instruct}
     entrypoint:
       - /bin/sh
       - -c
@@ -51,6 +56,9 @@ services:
       - "${WEBUI_PORT:-3000}:8080"
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      # Todos los usuarios con cuenta válida pueden usar los modelos base. El
+      # control de acceso real (quién tiene cuenta/key) lo aplica el gateway-api.
+      - BYPASS_MODEL_ACCESS_CONTROL=${BYPASS_MODEL_ACCESS_CONTROL:-true}
     volumes:
       - open_webui_data:/app/backend/data
     networks:
@@ -77,6 +85,51 @@ services:
       - ai_net
     restart: unless-stopped
 
+  # ── Gateway-API (FastAPI): capa de seguridad + estandarización sobre Open WebUI ──
+  # Los clientes consumen aquí con su PROPIA API key de Open WebUI (identity-transparent).
+  # Valida la key, aplica llm-guard (anti prompt-injection) y reenvía a Open WebUI.
+  gateway-api:
+    build:
+      context: ./gateway-api
+      args:
+        # true = instala llm-guard (imagen grande, prod). false = imagen ligera (dev).
+        INSTALL_GUARD: ${INSTALL_GUARD:-true}
+    depends_on:
+      open-webui:
+        condition: service_started
+    ports:
+      - "${GATEWAY_API_PORT:-8090}:8000"
+    environment:
+      - GATEWAY_OPENWEBUI_BASE_URL=http://open-webui:8080
+      - GATEWAY_OPENWEBUI_ADMIN_KEY=${OPENWEBUI_ADMIN_KEY}
+      - GATEWAY_ADMIN_BOOTSTRAP_KEY=${ADMIN_BOOTSTRAP_KEY}
+      - GATEWAY_GUARD_ENABLED=${GUARD_ENABLED:-true}
+      - GATEWAY_GUARD_USE_ONNX=${GUARD_USE_ONNX:-false}
+      - GATEWAY_GUARD_PROMPT_INJECTION_THRESHOLD=${GUARD_PI_THRESHOLD:-0.95}
+      - GATEWAY_GUARD_PROMPT_INJECTION_MODEL=${GUARD_PI_MODEL:-}
+      - GATEWAY_HF_TOKEN=${HF_TOKEN:-}
+      - GATEWAY_MAX_CONCURRENCY=${MAX_CONCURRENCY:-2}
+      - GATEWAY_QUEUE_TIMEOUT=${QUEUE_TIMEOUT:-30}
+      - GATEWAY_SYSTEM_PROMPT=${SYSTEM_PROMPT:-}
+      - GATEWAY_POLICY_FILE=${POLICY_FILE:-policy.yaml}
+    volumes:
+      # Caché de modelos de llm-guard (HuggingFace) para no re-descargar en cada recreate.
+      - gateway_api_cache:/root/.cache
+      # Política declarativa del guard. Si borras este montaje, el guard usa la
+      # política derivada de las variables de entorno. Ver gateway-api/policy.example.yaml
+      - ./gateway-api/policy.yaml:/app/policy.yaml:ro
+    healthcheck:
+      # /health solo responde tras el warmup; start_period amplio cubre la primera
+      # descarga del modelo del guard (puede tardar varios minutos con GUARD_ENABLED=true).
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 600s
+    networks:
+      - ai_net
+    restart: unless-stopped
+
 networks:
   ai_net:
     driver: bridge
@@ -84,3 +137,4 @@ networks:
 volumes:
   ollama_data:
   open_webui_data:
+  gateway_api_cache:
