@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from .. import concurrency, upstream
 from ..auth import AuthContext, AuthDep
+from ..policy import get_policy
 from ..schemas import ChatCompletionRequest
 from ..security import prompt_guard
 
@@ -36,6 +37,14 @@ async def chat_completions(req: ChatCompletionRequest, auth: AuthContext = AuthD
     """Valida la key, aplica el guard (anti-injection + política de system prompt),
     espera un slot de concurrencia y reenvía a Open WebUI con la **misma** key."""
     payload = req.to_upstream_payload()
+
+    # 0) Política: modelos permitidos (vacío = todos).
+    allowed = get_policy().models.allowed
+    if allowed and req.model not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "model_not_allowed", "model": req.model, "allowed": allowed},
+        )
 
     # 1) Guard: política estructural + escaneo anti-injection sobre los mensajes.
     messages = [m if isinstance(m, dict) else m.model_dump() for m in payload["messages"]]

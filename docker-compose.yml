@@ -110,9 +110,13 @@ services:
       - GATEWAY_MAX_CONCURRENCY=${MAX_CONCURRENCY:-2}
       - GATEWAY_QUEUE_TIMEOUT=${QUEUE_TIMEOUT:-30}
       - GATEWAY_SYSTEM_PROMPT=${SYSTEM_PROMPT:-}
+      - GATEWAY_POLICY_FILE=${POLICY_FILE:-policy.yaml}
     volumes:
       # Caché de modelos de llm-guard (HuggingFace) para no re-descargar en cada recreate.
       - gateway_api_cache:/root/.cache
+      # Política declarativa del guard (opcional). Si no montas un archivo, el guard
+      # usa la política derivada de las variables de entorno. Ver gateway-api/policy.example.yaml
+      # - ./gateway-api/policy.yaml:/app/policy.yaml:ro
     networks:
       - ai_net
     restart: unless-stopped

@@ -13,6 +13,14 @@ Capa **FastAPI** delante de Open WebUI que aporta:
 - 🧩 **Compatible OpenAI**: `/v1/chat/completions` (streaming incluido) y `/v1/models`.
 - 👤 **Provisión de usuarios** reales en Open WebUI vía `/admin/*`.
 
+## Política del guard (`policy.yaml`)
+
+El guard se configura de forma **declarativa**. Copia [policy.example.yaml](policy.example.yaml)
+a `policy.yaml`, descoméntalo en el `volumes` del servicio `gateway-api` y ajústalo
+(system prompt, roles, límites, modelos permitidos, etapas y su `fail_mode`/params).
+Si **no** montas el archivo, el guard deriva la política de las variables `GATEWAY_*`
+(comportamiento por defecto, sin cambios). Ruta configurable con `GATEWAY_POLICY_FILE`.
+
 ## Documentos relacionados
 
 - [docs/CONCURRENCY.md](docs/CONCURRENCY.md) — concurrencia, colas, 429 y por qué un LLM no escala como una API normal.

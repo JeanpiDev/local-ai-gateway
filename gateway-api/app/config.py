@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # Key bootstrap que protege los endpoints /admin/* de provisión.
     admin_bootstrap_key: str = ""
 
+    # ── Política declarativa del guard ───────────────────────────────────────
+    # Ruta a policy.yaml. Si no existe, se deriva la política de estas variables.
+    policy_file: str = "policy.yaml"
+
     # ── Anti prompt-injection (llm-guard) ────────────────────────────────────
     guard_enabled: bool = True
     guard_use_onnx: bool = False          # ONNX acelera en CPU si está disponible

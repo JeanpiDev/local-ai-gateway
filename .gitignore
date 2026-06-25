@@ -1,2 +1,5 @@
 .env
 *.log
+# Política viva del guard (específica del entorno). El template versionado es policy.example.yaml
+policy.yaml
+gateway-api/policy.yaml
