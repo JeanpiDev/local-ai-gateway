@@ -12,12 +12,16 @@ from typing import Callable
 from fastapi import HTTPException, status
 
 from ..policy import Policy, StageConfig, get_policy
+from .output_guard import OutputGuard
 from .pipeline import GuardBlocked, GuardContext, GuardPipeline, Stage
 from .stages import HeuristicsStage, LLMGuardStage, PolicyStructureStage
 
 logger = logging.getLogger("gateway.guard")
 
-# Registro de etapas: nombre -> constructor(policy, stage_config) -> Stage
+# Etapas de SALIDA: se declaran en la política pero NO van en el pipeline de entrada.
+OUTPUT_STAGES = {"OutputGuard"}
+
+# Registro de etapas de ENTRADA: nombre -> constructor(policy, stage_config) -> Stage
 STAGE_REGISTRY: dict[str, Callable[[Policy, StageConfig], Stage]] = {
     "PolicyStructure": lambda policy, cfg: PolicyStructureStage(policy),
     "Heuristics": lambda policy, cfg: HeuristicsStage(params=cfg.params),
@@ -28,6 +32,8 @@ STAGE_REGISTRY: dict[str, Callable[[Policy, StageConfig], Stage]] = {
 def _build_pipeline(policy: Policy) -> GuardPipeline:
     stages: list[Stage] = []
     for cfg in policy.stages:
+        if cfg.name in OUTPUT_STAGES:
+            continue  # las etapas de salida se manejan aparte (get_output_guard)
         if not cfg.enabled:
             logger.info("Etapa %s deshabilitada por política", cfg.name)
             continue
@@ -43,8 +49,21 @@ def _build_pipeline(policy: Policy) -> GuardPipeline:
     return GuardPipeline(stages)
 
 
+def _build_output_guard(policy: Policy) -> OutputGuard | None:
+    for cfg in policy.stages:
+        if cfg.name == "OutputGuard" and cfg.enabled:
+            logger.info("OutputGuard activo (checks=%s)", cfg.params.get("checks", ["system_prompt_leak", "secrets"]))
+            return OutputGuard(system_prompt=policy.system_prompt, params=cfg.params)
+    return None
+
+
 _policy = get_policy()
 _pipeline = _build_pipeline(_policy)
+_output_guard = _build_output_guard(_policy)
+
+
+def get_output_guard() -> OutputGuard | None:
+    return _output_guard
 
 
 def warmup() -> None:

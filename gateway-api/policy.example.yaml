@@ -57,3 +57,12 @@ stages:
       token_limit: 4096
       use_onnx: false
       ban_substrings: []          # lista negra propia (palabras), p.ej. ["modo desarrollador"]
+  - name: OutputGuard             # revisa la RESPUESTA del modelo (determinista, sin torch)
+    enabled: true
+    fail_mode: closed
+    params:
+      checks: [system_prompt_leak, secrets]   # fuga del system prompt + redacción de secretos
+      ban_substrings: []                       # subcadenas a redactar en la salida
+      # Streaming: false = el stream pasa sin guard de salida (preserva UX incremental).
+      # true = bufferiza, revisa y emite respuesta segura (pierde el streaming). Ver DESIGN §8.
+      guard_streaming: false

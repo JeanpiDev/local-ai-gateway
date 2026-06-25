@@ -89,6 +89,10 @@ def _default_policy_from_env() -> Policy:
                     "ban_substrings": s.ban_substrings_list,
                 },
             ),
+            StageConfig(
+                name="OutputGuard",
+                params={"checks": ["system_prompt_leak", "secrets"], "guard_streaming": False},
+            ),
         ],
     )
 
