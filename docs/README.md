@@ -10,5 +10,8 @@ Documentación del proyecto en un solo lugar.
 
 Ver también:
 - [README del proyecto](../README.md) — visión general del stack.
-- [gateway-api/README.md](../gateway-api/README.md) — la API FastAPI (endpoints, política, build).
+- [gateway-api/README.md](../gateway-api/README.md) — la API FastAPI (endpoints, política, build, tests).
 - [CLAUDE.md](../CLAUDE.md) — guía de arquitectura para trabajar en el repo.
+
+Pruebas: `gateway-api/tests/` (pytest, lógica del guard) y `scripts/verify-prod.sh` /
+`scripts/loadtest.py` (E2E y carga contra el stack levantado).

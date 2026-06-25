@@ -31,8 +31,9 @@ humanos   ──────────────────►   open-webui
 
 ## Comandos
 
-No hay sistema de build del repo ni suite de tests automatizada; la verificación se hace
-end-to-end con `curl`/PowerShell contra los contenedores. Todo es Docker Compose.
+Todo es Docker Compose. Hay **tests unitarios** (`gateway-api/tests/`, pytest) para la
+lógica del guard, y **verificación E2E** (`scripts/verify-prod.sh`, `scripts/loadtest.py`)
+contra los contenedores.
 
 ```bash
 docker compose up -d                       # levanta todo el stack
@@ -48,7 +49,19 @@ docker compose up -d --force-recreate gateway-api
 #   apunta GATEWAY_OPENWEBUI_BASE_URL al Open WebUI publicado (http://localhost:3000)
 pip install -r requirements.txt            # + requirements-guard.txt si quieres el guard
 uvicorn app.main:app --reload --port 8000
+
+# Tests unitarios del guard (rápidos, sin torch ni modelo gated):
+pip install -r requirements.txt -r requirements-dev.txt
+cd gateway-api && pytest                    # 29 tests (pipeline, etapas, output guard)
+
+# Verificación E2E / carga (contra el stack levantado):
+ADMIN_KEY=<bootstrap> bash scripts/verify-prod.sh        # smoke E2E
+docker exec local-ai-gateway-gateway-api-1 python /tmp/loadtest.py --admin-key <k>  # estrés
 ```
+
+Los tests usan un pipeline simulado para la etapa pesada, así que **no requieren torch**
+y corren en cualquier entorno. La integración real con llm-guard/modelo gated se valida
+con `verify-prod.sh` en prod.
 
 Docs interactivas del gateway-api: **`/docs`** (Swagger), `/redoc`, `/openapi.json`.
 

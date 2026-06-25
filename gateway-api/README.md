@@ -66,10 +66,13 @@ Con el servicio levantado:
 | `GATEWAY_ADMIN_BOOTSTRAP_KEY` | — | Protege `/admin/*` (`X-Admin-Key`) |
 | `GATEWAY_GUARD_ENABLED` | `true` | Activa llm-guard |
 | `GATEWAY_GUARD_USE_ONNX` | `false` | Acelera scanners en CPU |
-| `GATEWAY_GUARD_PROMPT_INJECTION_THRESHOLD` | `0.9` | Umbral de bloqueo |
+| `GATEWAY_GUARD_PROMPT_INJECTION_THRESHOLD` | `0.95` | Umbral de bloqueo (scanner inglés) |
+| `GATEWAY_GUARD_PROMPT_INJECTION_MODEL` | `""` | Modelo del scanner llm-guard (vacío = protectai) |
+| `GATEWAY_HF_TOKEN` | `""` | Token HF para modelos gated (etapa `PromptGuard`) |
+| `GATEWAY_POLICY_FILE` | `policy.yaml` | Ruta de la política; si no existe, se deriva de estas vars |
 | `GATEWAY_MAX_CONCURRENCY` | `2` | Peticiones simultáneas al backend |
 | `GATEWAY_QUEUE_TIMEOUT` | `30` | Seg. esperando slot antes de 429 |
-| `GATEWAY_SYSTEM_PROMPT` | `""` | System prompt fijo del servidor |
+| `GATEWAY_SYSTEM_PROMPT` | `""` | System prompt fijo (si no usas `policy.yaml`) |
 
 ## Build dev vs prod
 
@@ -78,6 +81,19 @@ Con el servicio levantado:
 # PROD (con llm-guard):
 docker compose build --build-arg INSTALL_GUARD=true gateway-api
 ```
+
+## Tests
+
+Suite **pytest** en `tests/` para la lógica del guard (pipeline, etapas, output guard).
+Rápida y **sin torch** (la etapa pesada se prueba con un pipeline simulado):
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+pytest                       # desde gateway-api/ (29 tests)
+```
+
+La integración real con llm-guard y el modelo gated se valida E2E en el servidor con
+[scripts/verify-prod.sh](../scripts/verify-prod.sh). Prueba de carga: `scripts/loadtest.py`.
 
 ## Onboarding de un usuario (una vez por persona)
 
