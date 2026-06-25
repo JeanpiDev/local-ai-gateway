@@ -50,6 +50,8 @@ Con el servicio levantado:
 | GET | `/health` | — | Liveness |
 | GET | `/v1/models` | Bearer (key OWUI) | Lista modelos |
 | POST | `/v1/chat/completions` | Bearer (key OWUI) | Chat (OpenAI-compatible, `stream` opc.) |
+| GET | `/admin/metrics` | `X-Admin-Key` | Contadores del guard (bloqueos por etapa, etc.) |
+| GET | `/admin/audit` | `X-Admin-Key` | Eventos recientes del guard (entrada/salida) |
 | POST | `/admin/setup` | `X-Admin-Key` | Habilita permiso `features.api_keys` en OWUI |
 | POST | `/admin/users` | `X-Admin-Key` | Crea usuario real + devuelve su `sk-...` |
 | DELETE | `/admin/users/{id}` | `X-Admin-Key` | Borra usuario |

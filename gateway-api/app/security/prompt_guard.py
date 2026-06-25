@@ -7,10 +7,12 @@ etapas; añadir una etapa nueva = registrarla aquí y declararla en `policy.yaml
 from __future__ import annotations
 
 import logging
+import time
 from typing import Callable
 
 from fastapi import HTTPException, status
 
+from .. import telemetry
 from ..policy import Policy, StageConfig, get_policy
 from .output_guard import OutputGuard
 from .pipeline import GuardBlocked, GuardContext, GuardPipeline, Stage
@@ -78,9 +80,16 @@ def warmup() -> None:
 def apply(messages: list[dict], user_id: str = "unknown") -> list[dict]:
     """Ejecuta el pipeline. Devuelve los mensajes listos para el backend o lanza 422."""
     ctx = GuardContext(messages=messages, user_id=user_id)
+    t0 = time.monotonic()
     try:
-        return _pipeline.run(ctx)
+        result = _pipeline.run(ctx)
+        latency = (time.monotonic() - t0) * 1000
+        outcome = "sanitize" if any(a.get("action") == "sanitize" for a in ctx.audit) else "allow"
+        telemetry.record_input(user_id, outcome, None, ctx.audit, latency)
+        return result
     except GuardBlocked as blocked:
+        latency = (time.monotonic() - t0) * 1000
+        telemetry.record_input(user_id, "block", blocked.stage, ctx.audit, latency)
         detail = blocked.result.detail or {
             "error": "input_rejected",
             "message": blocked.result.reason,

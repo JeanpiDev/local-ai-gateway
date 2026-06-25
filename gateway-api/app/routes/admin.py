@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
 
-from .. import upstream
+from .. import telemetry, upstream
 from ..auth import AdminDep
 from ..config import get_settings
 from ..schemas import ProvisionUserRequest, ProvisionUserResponse
@@ -38,6 +38,18 @@ def _admin_key() -> str:
             detail="GATEWAY_OPENWEBUI_ADMIN_KEY no configurada",
         )
     return key
+
+
+@router.get("/metrics", summary="Métricas del guard (contadores en memoria)")
+async def metrics():
+    """Contadores agregados: peticiones, bloqueos por etapa, sanitizaciones, degradados."""
+    return telemetry.metrics()
+
+
+@router.get("/audit", summary="Eventos recientes del guard")
+async def audit(limit: int = 50):
+    """Últimos eventos del guard (entrada y salida), más recientes primero."""
+    return {"events": telemetry.recent(limit)}
 
 
 @router.post("/setup", summary="Habilitar generación de API keys en Open WebUI")

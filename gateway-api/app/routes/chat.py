@@ -12,7 +12,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from .. import concurrency, upstream
+from .. import concurrency, telemetry, upstream
 from ..auth import AuthContext, AuthDep
 from ..policy import get_policy
 from ..schemas import ChatCompletionRequest
@@ -56,10 +56,10 @@ async def chat_completions(req: ChatCompletionRequest, auth: AuthContext = AuthD
     og = prompt_guard.get_output_guard()
     if req.stream:
         return await _stream(auth.token, payload, og)
-    return await _complete(auth.token, payload, og)
+    return await _complete(auth.token, payload, og, auth.user_id)
 
 
-async def _complete(token: str, payload: dict, og: OutputGuard | None) -> JSONResponse:
+async def _complete(token: str, payload: dict, og: OutputGuard | None, user_id: str = "unknown") -> JSONResponse:
     async with concurrency.slot():
         resp = await upstream.chat_completions(token, payload)
     if resp.status_code != 200:
@@ -83,6 +83,7 @@ async def _complete(token: str, payload: dict, og: OutputGuard | None) -> JSONRe
                 data["choices"][0]["message"]["content"] = res.text
                 if res.action is OutputAction.BLOCK:
                     data["choices"][0]["finish_reason"] = "content_filter"
+                telemetry.record_output(user_id, res.action.value, res.reason)
 
     return JSONResponse(content=data, status_code=200)
 
