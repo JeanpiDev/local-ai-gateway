@@ -69,12 +69,11 @@ el resto en cola con un límite de paciencia"**.
 | Dev (3b, 16 GB) | `OLLAMA_NUM_PARALLEL=2`, `MAX_CONCURRENCY=2` |
 | Prod (14b, 90 GB) | `OLLAMA_NUM_PARALLEL=4`, `MAX_CONCURRENCY=4` (la RAM lo permite) |
 
-## Medición
+## Medición (prueba de estrés)
 
-Hay una prueba de estrés reproducible: **`scripts/loadtest.py`** (asyncio + httpx).
-Hace un barrido de concurrencia contra `/v1/chat/completions` y reporta throughput,
-latencia p50/p95/p99 y conteo de 200/429/errores. Corre dentro del contenedor
-gateway-api (ya trae httpx):
+Una "prueba de estrés" manda muchas peticiones a la vez para ver **hasta dónde aguanta**
+el sistema. Usamos **`scripts/loadtest.py`** (no necesita instalar nada extra; corre
+dentro del contenedor del gateway):
 
 ```bash
 docker exec local-ai-gateway-gateway-api-1 python /tmp/loadtest.py \
@@ -82,17 +81,42 @@ docker exec local-ai-gateway-gateway-api-1 python /tmp/loadtest.py \
   --levels 1,2,4,8 --total 16 --max-tokens 64
 ```
 
-### Resultado en dev (16 GB, qwen2.5:7b, respuestas de 16 tokens, 2 slots)
+`--levels 1,2,4,8` = prueba con 1 petición a la vez, luego 2, luego 4, luego 8
+(esto es el "barrido de concurrencia": **concurrencia** = peticiones simultáneas).
 
-| conc | req/s | p50 |
+### Glosario rápido de la tabla
+- **conc** (concurrencia): cuántas peticiones llegan al mismo tiempo.
+- **req/s** (throughput): cuántas peticiones **completa por segundo**. Es la capacidad. Más = mejor.
+- **p50 / p95 / p99** (latencia, en segundos): cuánto tarda **una** petición.
+  - p50 = la mitad tardó menos que eso (la típica). p95 = solo 1 de cada 20 fue más lenta.
+  - p99 = solo 1 de cada 100 fue más lenta (el peor caso habitual).
+- **200 / 429 / err**: respuestas. 200 = OK. 429 = "saturado, reintenta". err = falló.
+- **slots**: cuántas peticiones procesa Ollama a la vez (`OLLAMA_NUM_PARALLEL`).
+
+### Resultado en dev (16 GB, qwen2.5:7b, respuestas cortas, 2 slots)
+
+| peticiones a la vez | req/s (capacidad) | p50 (lo que tarda la típica) |
 |---|---|---|
 | 1 | 0.95 | 1.0s |
 | 2 | 1.49 | 1.3s |
 | 4 | 1.53 | 2.6s |
 | 8 | 1.38 | 3.8s |
 
-El throughput **se aplana (~1.5 req/s)**: subir de 1→2 slots ayuda (+56%), de 4→8 no.
-Pasado el punto de saturación, más concurrencia solo añade **latencia**, no capacidad.
-**Abrir más usuarios no aumenta la capacidad** — las palancas reales son GPU o réplicas.
-(Cifras de dev; en prod con 14B el req/s es menor por petición pero la curva es igual.)
-Implementación del control: semáforo + cola en `app/concurrency.py`.
+**Cómo leerlo:** al pasar de 1 a 2 peticiones simultáneas, la capacidad subió bastante
+(de 0.95 a 1.49 req/s, +56%) porque el 2º "slot" se aprovecha. Pero de 4 a 8 ya **no sube**:
+se queda "estancada" en ~1.5 req/s (a esto se le llama **punto de saturación** o *plateau*).
+Lo único que crece de ahí en adelante es la **latencia** (cada petición tarda más porque
+hay que esperar turno): la típica pasa de 1s a casi 4s.
+
+**Conclusión para el negocio:** ese tope (~1.5 req/s aquí) es la capacidad máxima, sin
+importar cuántas personas usen el sistema. **Abrir más usuarios NO da más capacidad** —
+solo hace que todos esperen más. Para subir el tope de verdad: usar **GPU** (acelera la IA)
+o **réplicas** (varias copias de Ollama repartiendo la carga).
+
+> Estas cifras son de la máquina de desarrollo (16 GB, modelo 7B, respuestas cortas).
+> En producción (modelo 14B, respuestas largas) cada petición tardará más y el req/s será
+> menor, pero **la forma de la curva es la misma**: sube con los primeros slots y luego se
+> aplana. Por eso `loadtest.py` se vuelve a correr en el servidor para tener los números reales.
+
+El mecanismo que reparte el acceso (deja pasar N a la vez y encola al resto) está en
+`app/concurrency.py`.
