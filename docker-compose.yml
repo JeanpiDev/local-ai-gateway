@@ -118,6 +118,14 @@ services:
       # Política declarativa del guard. Si borras este montaje, el guard usa la
       # política derivada de las variables de entorno. Ver gateway-api/policy.example.yaml
       - ./gateway-api/policy.yaml:/app/policy.yaml:ro
+    healthcheck:
+      # /health solo responde tras el warmup; start_period amplio cubre la primera
+      # descarga del modelo del guard (puede tardar varios minutos con GUARD_ENABLED=true).
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 600s
     networks:
       - ai_net
     restart: unless-stopped
