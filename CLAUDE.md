@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Documentación detallada en **[docs/](docs/)**: `DESIGN.md` (pipeline del guard),
+`CONCURRENCY.md` (rendimiento/colas), `DEPLOYMENT.md` (producción).
+
 ## Qué es esto
 
 Stack Docker Compose de **IA local autohospedada** sobre Ollama. Hay **dos puertas de
@@ -85,11 +88,30 @@ Variables del gateway-api llevan prefijo `GATEWAY_` dentro del contenedor, pero 
 - **Imports de llm-guard son perezosos**: solo se cargan si `GUARD_ENABLED=true`. Permite correr
   la imagen ligera sin torch. La caché de modelos persiste en el volumen `gateway_api_cache`.
 
+## El guard: pipeline por etapas declarado por política
+
+El guard NO es monolítico: es un **pipeline de etapas** (`security/pipeline.py`) que se
+construye **desde la política** (`policy.py` carga `policy.yaml`, o la deriva de env si no
+existe). `security/prompt_guard.py` arma el pipeline vía `STAGE_REGISTRY` y expone
+`apply()`/`get_output_guard()`. Cada etapa implementa `Stage.run(ctx) -> StageResult`
+(allow/sanitize/block), corta en el primer `block` y aplica su `fail_mode` (closed=bloquea,
+open=degrada) si lanza. Etapas en `security/stages.py`:
+- `PolicyStructure` (system prompt fijo, roles, límites) — fail-closed.
+- `Heuristics` (regex ES/EN de injection, sin modelo) — fail-closed.
+- `LLMGuard` (llm-guard: PromptInjection inglés + redacción Secrets/PII) — fail-open.
+- `PromptGuard` (modelo multilingüe Meta Prompt Guard 2, gated) — fail-open.
+- `OutputGuard` (`security/output_guard.py`, revisa la RESPUESTA: fuga de system prompt,
+  secretos) — se aplica en `routes/chat.py`, no en el pipeline de entrada.
+
+Añadir una etapa = implementar `Stage`, registrarla en `STAGE_REGISTRY` y declararla en
+`policy.yaml`. Ver [docs/DESIGN.md](docs/DESIGN.md).
+
 ## Estructura de gateway-api/
 
-`app/main.py` (app + lifespan + metadatos OpenAPI) · `config.py` (settings) · `auth.py`
-(HTTPBearer + APIKeyHeader, caché de validación) · `upstream.py` (cliente httpx a Open WebUI,
-único punto de llamadas al backend) · `concurrency.py` (semáforo/429) ·
-`security/prompt_guard.py` (pipeline llm-guard + política de system prompt) ·
-`routes/{chat,models,admin}.py`. Las rutas exponen tanto `/v1/*` (OpenAI) como alias `/api/*`
-(nativos de Open WebUI, ocultos del schema).
+`app/main.py` (app + lifespan + OpenAPI) · `config.py` (settings) · `policy.py` (modelos
+pydantic + carga de `policy.yaml`) · `auth.py` (HTTPBearer + APIKeyHeader, caché) ·
+`upstream.py` (cliente httpx a Open WebUI, único punto de llamadas al backend) ·
+`concurrency.py` (semáforo/429) · `telemetry.py` (contadores + audit en memoria) ·
+`security/` (`pipeline.py`, `stages.py`, `output_guard.py`, `prompt_guard.py`) ·
+`routes/{chat,models,admin}.py`. Las rutas exponen `/v1/*` (OpenAI) y alias `/api/*`
+(nativos de Open WebUI, ocultos del schema). Observabilidad: `/admin/metrics`, `/admin/audit`.

@@ -4,7 +4,7 @@ Cada etapa (`Stage`) inspecciona/transforma los mensajes y devuelve un `StageRes
 El `GuardPipeline` las ejecuta en orden, corta en el primer `BLOCK` (short-circuit) y
 aplica el `fail_mode` de cada etapa si lanza una excepción (circuit breaker / degradación).
 
-Ver el diseño completo en `gateway-api/DESIGN.md`.
+Ver el diseño completo en `docs/DESIGN.md`.
 """
 from __future__ import annotations
 

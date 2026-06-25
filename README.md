@@ -19,7 +19,17 @@ proyecto** pueda consumirlo desde su propio dominio. Incluye además
 - **ollama**: motor de inferencia (no expuesto al host; solo red interna).
 - **ollama-init**: descarga el modelo (`OLLAMA_MODEL`) al levantar.
 - **open-webui**: chat web para personas.
-- **gateway**: única puerta de entrada externa a la API; exige API key.
+- **gateway** (nginx, legacy): entrada simple a la API con una API key única; proxy directo a Ollama.
+- **gateway-api** (FastAPI): capa de seguridad sobre Open WebUI — multiusuario, anti
+  prompt-injection (pipeline por etapas), control de concurrencia y observabilidad.
+  Es la entrada recomendada. Ver [gateway-api/README.md](gateway-api/README.md).
+
+## Documentación
+
+Toda la documentación está en **[docs/](docs/)**:
+- [docs/DESIGN.md](docs/DESIGN.md) — diseño del pipeline anti prompt-injection.
+- [docs/CONCURRENCY.md](docs/CONCURRENCY.md) — concurrencia, colas y rendimiento.
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — despliegue en producción.
 
 ## Requisitos
 

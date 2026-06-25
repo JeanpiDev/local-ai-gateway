@@ -7,7 +7,7 @@ Se carga de un `policy.yaml` (ruta en `GATEWAY_POLICY_FILE`, por defecto `policy
 Si el archivo no existe, se deriva una política equivalente desde las variables de
 entorno → **comportamiento idéntico** al de antes de la Fase 2 (retrocompatibilidad).
 
-Ver `gateway-api/policy.example.yaml` y `gateway-api/DESIGN.md`.
+Ver `gateway-api/policy.example.yaml` y `docs/DESIGN.md`.
 """
 from __future__ import annotations
 

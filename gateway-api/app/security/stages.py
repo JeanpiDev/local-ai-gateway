@@ -7,7 +7,7 @@
 - `LLMGuardStage` (etapas 3+4): escaneo llm-guard. Redacción sanea; gate bloquea.
   Fail-open (etapa pesada).
 
-Etapa futura (Output Guard): ver `gateway-api/DESIGN.md`.
+Etapa futura (Output Guard): ver `docs/DESIGN.md`.
 """
 from __future__ import annotations
 

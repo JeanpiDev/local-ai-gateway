@@ -31,8 +31,9 @@ La etapa de heurísticas (regex ES/EN) ya cubre los ataques obvios sin modelo.
 
 ## Documentos relacionados
 
-- [docs/CONCURRENCY.md](docs/CONCURRENCY.md) — concurrencia, colas, 429 y por qué un LLM no escala como una API normal.
-- [DESIGN.md](DESIGN.md) — diseño del pipeline anti prompt-injection por etapas (propuesta).
+- [CONCURRENCY.md](../docs/CONCURRENCY.md) — concurrencia, colas, 429 y por qué un LLM no escala como una API normal.
+- [DESIGN.md](../docs/DESIGN.md) — diseño del pipeline anti prompt-injection por etapas.
+- [DEPLOYMENT.md](../docs/DEPLOYMENT.md) — guía de despliegue en producción.
 
 ## Documentación interactiva (Swagger / OpenAPI)
 

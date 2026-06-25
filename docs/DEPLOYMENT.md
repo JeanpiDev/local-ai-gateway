@@ -4,8 +4,8 @@ Guía para desplegar el stack (Ollama + Open WebUI + gateway-api con el guard
 anti prompt-injection) en el servidor de producción **sin GPU, CPU potente, ~90 GB RAM**.
 
 > Contexto de rendimiento: el CPU es el techo de throughput (ver
-> [gateway-api/docs/CONCURRENCY.md](gateway-api/docs/CONCURRENCY.md)). La RAM permite
-> modelos grandes y varios slots, no más velocidad por petición.
+> [CONCURRENCY.md](CONCURRENCY.md)). La RAM permite modelos grandes y varios slots,
+> no más velocidad por petición.
 
 ## 0. Requisitos del servidor
 - Docker + Docker Compose v2.
@@ -63,7 +63,7 @@ docker compose logs -f gateway-api       # espera "Application startup complete"
 
 ## 5. `policy.yaml` de producción
 
-Edita [gateway-api/policy.yaml](gateway-api/policy.yaml) (está montado en el contenedor):
+Edita [gateway-api/policy.yaml](../gateway-api/policy.yaml) (está montado en el contenedor):
 
 ```yaml
 system_prompt: "<el system prompt de tu empresa>"

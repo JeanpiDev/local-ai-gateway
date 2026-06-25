@@ -67,7 +67,3 @@ class ProvisionUserResponse(BaseModel):
     email: str
     role: str
     api_key: str = Field(description="API key personal (sk-...) para consumir el gateway.")
-
-
-class ErrorResponse(BaseModel):
-    detail: Any

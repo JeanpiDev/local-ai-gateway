@@ -7,7 +7,7 @@
 #
 # Para usarlo en Docker: monta este archivo en el contenedor y setea
 #   GATEWAY_POLICY_FILE=/app/policy.yaml
-# Ver gateway-api/DESIGN.md para el diseño completo del pipeline por etapas.
+# Ver docs/DESIGN.md para el diseño completo del pipeline por etapas.
 
 version: 1
 
