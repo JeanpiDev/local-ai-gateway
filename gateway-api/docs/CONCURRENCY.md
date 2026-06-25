@@ -71,7 +71,28 @@ el resto en cola con un límite de paciencia"**.
 
 ## Medición
 
-El cuello de botella es el CPU: medido en este stack, el throughput se mantiene plano
-(~0.11 req/s) al subir la concurrencia, mientras la latencia de los últimos crece de
-forma lineal. Conclusión: **abrir más usuarios no aumenta la capacidad**; las palancas
-reales son GPU o réplicas. Implementación: semáforo + cola en `app/concurrency.py`.
+Hay una prueba de estrés reproducible: **`scripts/loadtest.py`** (asyncio + httpx).
+Hace un barrido de concurrencia contra `/v1/chat/completions` y reporta throughput,
+latencia p50/p95/p99 y conteo de 200/429/errores. Corre dentro del contenedor
+gateway-api (ya trae httpx):
+
+```bash
+docker exec local-ai-gateway-gateway-api-1 python /tmp/loadtest.py \
+  --admin-key "$ADMIN_BOOTSTRAP_KEY" --model qwen2.5:14b-instruct \
+  --levels 1,2,4,8 --total 16 --max-tokens 64
+```
+
+### Resultado en dev (16 GB, qwen2.5:7b, respuestas de 16 tokens, 2 slots)
+
+| conc | req/s | p50 |
+|---|---|---|
+| 1 | 0.95 | 1.0s |
+| 2 | 1.49 | 1.3s |
+| 4 | 1.53 | 2.6s |
+| 8 | 1.38 | 3.8s |
+
+El throughput **se aplana (~1.5 req/s)**: subir de 1→2 slots ayuda (+56%), de 4→8 no.
+Pasado el punto de saturación, más concurrencia solo añade **latencia**, no capacidad.
+**Abrir más usuarios no aumenta la capacidad** — las palancas reales son GPU o réplicas.
+(Cifras de dev; en prod con 14B el req/s es menor por petición pero la curva es igual.)
+Implementación del control: semáforo + cola en `app/concurrency.py`.
