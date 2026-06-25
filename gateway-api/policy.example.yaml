@@ -57,6 +57,14 @@ stages:
       token_limit: 4096
       use_onnx: false
       ban_substrings: []          # lista negra propia (palabras), p.ej. ["modo desarrollador"]
+  - name: PromptGuard            # detección de injection MULTILINGÜE (Meta Prompt Guard 2)
+    enabled: false               # activar en prod con token HF; deshabilitada por defecto
+    fail_mode: open
+    params:
+      model: "meta-llama/Llama-Prompt-Guard-2-86M"   # gated: requiere HF_TOKEN
+      threshold: 0.5
+      malicious_labels: [label_1, malicious, injection, jailbreak]
+      # hf_token: ""             # opcional aquí; normalmente vía env HF_TOKEN
   - name: OutputGuard             # revisa la RESPUESTA del modelo (determinista, sin torch)
     enabled: true
     fail_mode: closed

@@ -21,6 +21,14 @@ a `policy.yaml`, descoméntalo en el `volumes` del servicio `gateway-api` y ajú
 Si **no** montas el archivo, el guard deriva la política de las variables `GATEWAY_*`
 (comportamiento por defecto, sin cambios). Ruta configurable con `GATEWAY_POLICY_FILE`.
 
+### Detección multilingüe (etapa `PromptGuard`)
+
+El scanner de llm-guard es inglés-céntrico (falsos positivos con español). Para
+español, activa la etapa `PromptGuard` en `policy.yaml` (deshabilitada por defecto):
+usa **Meta Llama Prompt Guard 2** (mDeBERTa, multilingüe). Es un modelo **gated**:
+acepta la licencia en su página de HuggingFace y pon tu token en `HF_TOKEN`.
+La etapa de heurísticas (regex ES/EN) ya cubre los ataques obvios sin modelo.
+
 ## Documentos relacionados
 
 - [docs/CONCURRENCY.md](docs/CONCURRENCY.md) — concurrencia, colas, 429 y por qué un LLM no escala como una API normal.

@@ -12,6 +12,7 @@ Etapa futura (Output Guard): ver `gateway-api/DESIGN.md`.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import Any
 
@@ -264,3 +265,87 @@ class LLMGuardStage(Stage):
                 sanitized_any = True
 
         return StageResult(action=StageAction.SANITIZE if sanitized_any else StageAction.ALLOW)
+
+
+class PromptGuardStage(Stage):
+    """Detección de injection con un modelo de clasificación MULTILINGÜE (transformers).
+
+    Alternativa multilingüe al PromptInjection (inglés) de llm-guard. Pensada para
+    Meta Llama Prompt Guard 2 (mDeBERTa, gated → requiere token HF), pero sirve con
+    cualquier clasificador binario de texto vía mapeo de etiquetas. Fail-open.
+    """
+    name = "PromptGuard"
+    fail_mode = "open"
+
+    DEFAULT_MODEL = "meta-llama/Llama-Prompt-Guard-2-86M"
+
+    def __init__(self, params: dict[str, Any] | None = None) -> None:
+        params = params or {}
+        self.model = params.get("model") or self.DEFAULT_MODEL
+        self.threshold: float = params.get("threshold", 0.5)
+        self.max_length: int = params.get("max_length", 512)
+        self.malicious_labels = {
+            str(label).lower()
+            for label in params.get("malicious_labels", ["label_1", "malicious", "injection", "jailbreak"])
+        }
+        self.hf_token: str = (
+            params.get("hf_token")
+            or get_settings().hf_token
+            or os.environ.get("HF_TOKEN", "")
+        )
+        self._pipe: Any = None
+
+    def _build(self) -> None:
+        from transformers import pipeline
+
+        self._pipe = pipeline(
+            "text-classification",
+            model=self.model,
+            top_k=None,                 # devuelve todas las etiquetas con score
+            truncation=True,
+            max_length=self.max_length,
+            token=self.hf_token or None,
+        )
+        logger.info("PromptGuard cargado: %s", self.model)
+
+    def warmup(self) -> None:
+        if get_settings().guard_enabled and self._pipe is None:
+            self._build()
+
+    def _malicious_score(self, text: str) -> float:
+        results = self._pipe(text)
+        # `top_k=None` puede devolver list[dict] o list[list[dict]] según versión.
+        scores = results[0] if results and isinstance(results[0], list) else results
+        for entry in scores:
+            if str(entry.get("label", "")).lower() in self.malicious_labels:
+                return float(entry.get("score", 0.0))
+        return 0.0
+
+    def run(self, ctx: GuardContext) -> StageResult:
+        if not get_settings().guard_enabled:
+            return StageResult(action=StageAction.ALLOW)
+        if self._pipe is None:
+            self._build()
+
+        for msg in ctx.messages:
+            if msg.get("role") != "user":
+                continue
+            text = content_to_text(msg.get("content"))
+            if not text:
+                continue
+            score = self._malicious_score(text)
+            if score >= self.threshold:
+                logger.warning("PromptGuard bloqueó (score=%.3f, modelo=%s)", score, self.model)
+                return StageResult(
+                    action=StageAction.BLOCK,
+                    score=score,
+                    reason="injection detectado por modelo multilingüe",
+                    detail={
+                        "error": "input_rejected",
+                        "message": "El contenido fue bloqueado por la capa de seguridad.",
+                        "blocked_by": ["PromptGuard"],
+                        "score": round(score, 4),
+                        "model": self.model,
+                    },
+                )
+        return StageResult(action=StageAction.ALLOW)

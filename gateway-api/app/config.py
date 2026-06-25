@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     # ── Anti prompt-injection (llm-guard) ────────────────────────────────────
     guard_enabled: bool = True
     guard_use_onnx: bool = False          # ONNX acelera en CPU si está disponible
+    # Token de HuggingFace (para modelos gated como Meta Prompt Guard 2).
+    hf_token: str = ""
     guard_prompt_injection_threshold: float = 0.95
     # Modelo de detección de prompt-injection. Vacío = modelo por defecto de
     # llm-guard (protectai, SOLO INGLÉS: da falsos positivos con órdenes en
