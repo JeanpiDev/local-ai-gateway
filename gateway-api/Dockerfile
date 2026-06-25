@@ -19,6 +19,20 @@ COPY requirements.txt requirements-guard.txt ./
 RUN pip install -r requirements.txt \
  && if [ "$INSTALL_GUARD" = "true" ]; then pip install -r requirements-guard.txt; fi
 
+# Assets de Swagger UI y ReDoc auto-hospedados (para que /docs y /redoc funcionen
+# sin salida a internet / CDN). Se descargan en build y quedan dentro de la imagen.
+RUN mkdir -p static && python - <<'PY'
+import urllib.request as u
+assets = {
+    "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui-bundle.js": "static/swagger-ui-bundle.js",
+    "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui.css": "static/swagger-ui.css",
+    "https://cdn.jsdelivr.net/npm/redoc@2.1.5/bundles/redoc.standalone.js": "static/redoc.standalone.js",
+}
+for src, dst in assets.items():
+    u.urlretrieve(src, dst)
+    print("descargado", dst)
+PY
+
 COPY app ./app
 
 EXPOSE 8000

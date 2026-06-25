@@ -5,6 +5,8 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+from fastapi.staticfiles import StaticFiles
 
 from . import concurrency, upstream
 from .config import get_settings
@@ -60,9 +62,36 @@ app = FastAPI(
     openapi_tags=TAGS_METADATA,
     contact={"name": "Local AI Gateway", "url": "http://localhost:8090/docs"},
     license_info={"name": "Interno"},
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # Docs por defecto desactivados: se sirven abajo con assets locales (sin CDN).
+    docs_url=None,
+    redoc_url=None,
 )
+
+# Assets de Swagger/ReDoc servidos localmente (descargados en el build) para que
+# /docs y /redoc funcionen sin salida a internet. Si la carpeta no existe (p.ej. al
+# correr fuera de Docker sin descargarlos), los docs simplemente no se montan.
+import os  # noqa: E402
+
+_STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+if os.path.isdir(_STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+
+    @app.get("/docs", include_in_schema=False)
+    async def swagger_ui():
+        return get_swagger_ui_html(
+            openapi_url=app.openapi_url,
+            title=f"{app.title} — Swagger UI",
+            swagger_js_url="/static/swagger-ui-bundle.js",
+            swagger_css_url="/static/swagger-ui.css",
+        )
+
+    @app.get("/redoc", include_in_schema=False)
+    async def redoc_ui():
+        return get_redoc_html(
+            openapi_url=app.openapi_url,
+            title=f"{app.title} — ReDoc",
+            redoc_js_url="/static/redoc.standalone.js",
+        )
 
 app.include_router(models.router)
 app.include_router(chat.router)
