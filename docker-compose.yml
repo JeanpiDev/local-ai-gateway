@@ -39,7 +39,7 @@ services:
       - ai_net
     environment:
       - OLLAMA_HOST=http://ollama:11434
-      - MODEL=${OLLAMA_MODEL:-qwen2.5:7b-instruct}
+      - MODEL=${OLLAMA_MODEL:-qwen2.5:3b-instruct}
     entrypoint:
       - /bin/sh
       - -c

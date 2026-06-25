@@ -6,7 +6,7 @@ throughput (req/s), latencia p50/p95/p99, y conteo de 200 / 429 / errores. Sirve
 hallar el límite de peticiones concurrentes y validar el comportamiento de cola/429.
 
 Uso (dentro del contenedor gateway-api, que ya trae httpx):
-  python /tmp/loadtest.py --admin-key <ADMIN_BOOTSTRAP_KEY> --model qwen2.5:7b-instruct \
+  python /tmp/loadtest.py --admin-key <ADMIN_BOOTSTRAP_KEY> --model qwen2.5:3b-instruct \
       --levels 1,2,4 --total 6 --max-tokens 16
 
 Si pasas --api-key usa esa key; si pasas --admin-key, provisiona un usuario temporal
@@ -60,7 +60,7 @@ async def main():
     ap.add_argument("--gateway-url", default=os.environ.get("GATEWAY_URL", "http://localhost:8000"))
     ap.add_argument("--api-key", default=os.environ.get("API_KEY", ""))
     ap.add_argument("--admin-key", default=os.environ.get("ADMIN_KEY", ""))
-    ap.add_argument("--model", default=os.environ.get("MODEL", "qwen2.5:7b-instruct"))
+    ap.add_argument("--model", default=os.environ.get("MODEL", "qwen2.5:3b-instruct"))
     ap.add_argument("--levels", default="1,2,4")
     ap.add_argument("--total", type=int, default=6, help="peticiones por nivel")
     ap.add_argument("--max-tokens", type=int, default=16)

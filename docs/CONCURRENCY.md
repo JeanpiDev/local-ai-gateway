@@ -93,30 +93,32 @@ docker exec local-ai-gateway-gateway-api-1 python /tmp/loadtest.py \
 - **200 / 429 / err**: respuestas. 200 = OK. 429 = "saturado, reintenta". err = falló.
 - **slots**: cuántas peticiones procesa Ollama a la vez (`OLLAMA_NUM_PARALLEL`).
 
-### Resultado en dev (16 GB, qwen2.5:7b, respuestas cortas, 2 slots)
+### Resultado en dev (16 GB, qwen2.5:3b-instruct, respuestas cortas, 2 slots)
 
 | peticiones a la vez | req/s (capacidad) | p50 (lo que tarda la típica) |
 |---|---|---|
-| 1 | 0.95 | 1.0s |
-| 2 | 1.49 | 1.3s |
-| 4 | 1.53 | 2.6s |
-| 8 | 1.38 | 3.8s |
+| 1 | 0.11 | 8.9s |
+| 2 | 0.17 | 12.9s |
+| 4 | 0.19 | 20.6s |
+| 8 | 0.21 | 24.0s |
 
-**Cómo leerlo:** al pasar de 1 a 2 peticiones simultáneas, la capacidad subió bastante
-(de 0.95 a 1.49 req/s, +56%) porque el 2º "slot" se aprovecha. Pero de 4 a 8 ya **no sube**:
-se queda "estancada" en ~1.5 req/s (a esto se le llama **punto de saturación** o *plateau*).
-Lo único que crece de ahí en adelante es la **latencia** (cada petición tarda más porque
-hay que esperar turno): la típica pasa de 1s a casi 4s.
+**Cómo leerlo:** la capacidad (req/s) es **muy baja y apenas sube** al meter más peticiones
+a la vez — está limitada por el CPU. Lo que sí crece, y mucho, es la **latencia**: la típica
+pasa de ~9s a ~24s. Es decir, pasado el primer par de slots, más concurrencia **no da más
+capacidad, solo más espera** (cada quien hace cola por el CPU).
 
-**Conclusión para el negocio:** ese tope (~1.5 req/s aquí) es la capacidad máxima, sin
-importar cuántas personas usen el sistema. **Abrir más usuarios NO da más capacidad** —
-solo hace que todos esperen más. Para subir el tope de verdad: usar **GPU** (acelera la IA)
-o **réplicas** (varias copias de Ollama repartiendo la carga).
+> ⚠️ Estas cifras de dev son **muy ruidosas**: el portátil (16 GB, CPU) estaba en uso, así
+> que los tiempos absolutos varían bastante entre corridas. **No las tomes como referencia**;
+> sirven solo para ver la *forma* (capacidad plana, latencia creciente). Los números reales
+> se miden en el servidor con `scripts/loadtest.py`.
 
-> Estas cifras son de la máquina de desarrollo (16 GB, modelo 7B, respuestas cortas).
-> En producción (modelo 14B, respuestas largas) cada petición tardará más y el req/s será
-> menor, pero **la forma de la curva es la misma**: sube con los primeros slots y luego se
-> aplana. Por eso `loadtest.py` se vuelve a correr en el servidor para tener los números reales.
+**Conclusión para el negocio:** la capacidad máxima la pone el CPU, **sin importar cuántas
+personas usen el sistema**. **Abrir más usuarios NO da más capacidad** — solo hace que todos
+esperen más. Para subir el tope de verdad: usar **GPU** (acelera la IA) o **réplicas** (varias
+copias de Ollama repartiendo la carga).
+
+> En producción (servidor con RAM holgada, modelo 14B) conviene correr `loadtest.py` para
+> obtener la curva real con tu hardware y dimensionar la concurrencia.
 
 El mecanismo que reparte el acceso (deja pasar N a la vez y encola al resto) está en
-`app/concurrency.py`.
+`gateway-api/app/concurrency.py`.

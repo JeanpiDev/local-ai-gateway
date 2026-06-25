@@ -67,7 +67,7 @@ curl http://<dominio>:8080/v1/chat/completions \
   -H "Authorization: Bearer <LLM_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "qwen2.5:7b-instruct",
+    "model": "qwen2.5:3b-instruct",
     "messages": [{"role": "user", "content": "Hola"}]
   }'
 ```
@@ -78,7 +78,7 @@ Python (cliente OpenAI):
 from openai import OpenAI
 client = OpenAI(base_url="http://<dominio>:8080/v1", api_key="<LLM_API_KEY>")
 resp = client.chat.completions.create(
-    model="qwen2.5:7b-instruct",
+    model="qwen2.5:3b-instruct",
     messages=[{"role": "user", "content": "Hola"}],
 )
 ```
@@ -90,7 +90,7 @@ cambiando el `base_url` y la api key. Por ejemplo, en un backend con fallback LL
 
 ```
 FALLBACK_LLM_PROVIDER=openai
-FALLBACK_LLM_MODEL=qwen2.5:7b-instruct
+FALLBACK_LLM_MODEL=qwen2.5:3b-instruct
 FALLBACK_LLM_API_KEY=<LLM_API_KEY>
 FALLBACK_LLM_BASE_URL=http://<dominio>:8080/v1
 ```
@@ -108,6 +108,7 @@ FALLBACK_LLM_BASE_URL=http://<dominio>:8080/v1
 
 ## Modelos
 
-Cambia `OLLAMA_MODEL` en `.env` y recrea. Para el análisis estructurado (JSON)
-se recomienda `qwen2.5:7b-instruct`. Para descargar modelos adicionales bajo
-demanda: `docker compose exec ollama ollama pull <modelo>`.
+Cambia `OLLAMA_MODEL` en `.env` y recrea. Recomendado: `qwen2.5:3b-instruct` en
+desarrollo (CPU, ágil) y `qwen2.5:14b-instruct` en producción (servidor con RAM
+holgada). Para descargar modelos adicionales bajo demanda:
+`docker compose exec ollama ollama pull <modelo>`.
